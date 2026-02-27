@@ -25,7 +25,7 @@ export async function middleware(req: NextRequest) {
   const isAuth = !!data.user;
 
   const path = req.nextUrl.pathname;
-  const isPublic = path === "/" || path.startsWith("/login") || path.startsWith("/auth");
+  const isPublic = path.startsWith("/login") || path.startsWith("/auth");
 
   if (!isAuth && !isPublic) {
     const url = req.nextUrl.clone();
