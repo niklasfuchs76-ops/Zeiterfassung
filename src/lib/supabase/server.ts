@@ -3,8 +3,9 @@ import { cookies } from "next/headers";
 
 export function createSupabaseServerClient() {
   const cookieStore = cookies();
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
-  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "";
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  if (!url || !anonKey) return null;
 
   return createServerClient(url, anonKey, {
     cookies: {
@@ -31,6 +32,7 @@ export function createSupabaseServerClient() {
 
 export async function getSessionUser() {
   const supabase = createSupabaseServerClient();
+  if (!supabase) return null;
   const { data } = await supabase.auth.getUser();
   return data.user ?? null;
 }

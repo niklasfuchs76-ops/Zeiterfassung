@@ -17,8 +17,11 @@ const NAV = [
 ];
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
-  const user = await getSessionUser();
-  if (!user) redirect("/login");
+  const supabaseConfigured = Boolean(
+    process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+  );
+  const user = supabaseConfigured ? await getSessionUser() : null;
+  if (supabaseConfigured && !user) redirect("/login");
 
   return (
     <div className="flex min-h-screen">
@@ -39,7 +42,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           ))}
         </nav>
         <div className="mt-6 border-t border-border/60 pt-4 text-xs text-muted-foreground">
-          {user.email}
+          {user?.email ?? "preview mode — Supabase not configured"}
         </div>
       </aside>
       <main className="flex-1 p-6 md:p-10">{children}</main>
