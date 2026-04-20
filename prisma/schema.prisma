@@ -1,0 +1,278 @@
+// ContentFlow — Prisma schema
+// See MASTER BUILD PROMPT section 2.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ---------- Users & Organizations ----------
+
+model User {
+  id          String       @id @default(cuid())
+  email       String       @unique
+  name        String?
+  avatarUrl   String?
+  createdAt   DateTime     @default(now())
+  memberships OrgMember[]
+}
+
+model Organization {
+  id        String         @id @default(cuid())
+  name      String
+  planTier  PlanTier       @default(FREE)
+  createdAt DateTime       @default(now())
+  members   OrgMember[]
+  brands    BrandProfile[]
+}
+
+model OrgMember {
+  id     String       @id @default(cuid())
+  orgId  String
+  userId String
+  role   Role         @default(MEMBER)
+  org    Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  user   User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([orgId, userId])
+}
+
+enum Role {
+  OWNER
+  ADMIN
+  EDITOR
+  MEMBER
+  VIEWER
+}
+
+enum PlanTier {
+  FREE
+  STARTER
+  PRO
+  AGENCY
+}
+
+// ---------- Brand Profile ----------
+
+model BrandProfile {
+  id                  String               @id @default(cuid())
+  orgId               String
+  name                String
+  niche               String
+  targetAudience      Json
+  voiceTraits         Json
+  goals               Json
+  contentPillars      Json
+  brandAssets         Json?
+  competitorRefs      String[]
+  postingFrequency    Json
+  createdAt           DateTime             @default(now())
+  org                 Organization         @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  platformConnections PlatformConnection[]
+  ideas               ContentIdea[]
+  posts               Post[]
+  insights            PerformanceInsight[]
+
+  @@index([orgId])
+}
+
+model PlatformConnection {
+  id              String           @id @default(cuid())
+  brandId         String
+  platform        Platform
+  accountHandle   String
+  accountId       String
+  accessTokenEnc  String
+  refreshTokenEnc String?
+  expiresAt       DateTime?
+  scopes          String[]
+  status          ConnectionStatus @default(ACTIVE)
+  connectedAt     DateTime         @default(now())
+  brand           BrandProfile     @relation(fields: [brandId], references: [id], onDelete: Cascade)
+
+  @@unique([brandId, platform])
+}
+
+enum Platform {
+  INSTAGRAM
+  LINKEDIN
+  TIKTOK
+  X
+  FACEBOOK
+  PINTEREST
+  YOUTUBE
+}
+
+enum ConnectionStatus {
+  ACTIVE
+  EXPIRED
+  REVOKED
+  ERROR
+}
+
+// ---------- Content Pipeline ----------
+
+model ContentIdea {
+  id                String        @id @default(cuid())
+  brandId           String
+  hook              String
+  format            ContentFormat
+  platformFit       Platform[]
+  pillar            String
+  funnelStage       FunnelStage
+  effortScore       Int
+  viralityPotential Int
+  rationale         String
+  source            IdeaSource
+  status            IdeaStatus    @default(SUGGESTED)
+  createdAt         DateTime      @default(now())
+  brand             BrandProfile  @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  posts             Post[]
+
+  @@index([brandId, status])
+}
+
+enum ContentFormat {
+  REEL
+  CAROUSEL
+  SINGLE_IMAGE
+  THREAD
+  SHORT_VIDEO
+  STORY
+  LONG_POST
+}
+
+enum FunnelStage {
+  TOFU
+  MOFU
+  BOFU
+}
+
+enum IdeaSource {
+  AI
+  USER
+  TREND
+  RECYCLED
+}
+
+enum IdeaStatus {
+  SUGGESTED
+  ACCEPTED
+  DRAFTED
+  ARCHIVED
+}
+
+model Post {
+  id            String         @id @default(cuid())
+  brandId       String
+  ideaId        String?
+  platform      Platform
+  format        ContentFormat
+  caption       String
+  hookVariants  Json
+  hashtags      String[]
+  cta           String?
+  visualBrief   String?
+  altText       String?
+  mediaUrls     String[]
+  visualPrompts Json?
+  status        PostStatus     @default(DRAFT)
+  approvedBy    String?
+  approvedAt    DateTime?
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  brand         BrandProfile   @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  idea          ContentIdea?   @relation(fields: [ideaId], references: [id])
+  scheduled     ScheduledPost?
+  metrics       PostMetrics[]
+
+  @@index([brandId, status])
+}
+
+enum PostStatus {
+  DRAFT
+  APPROVED
+  SCHEDULED
+  POSTED
+  FAILED
+  ARCHIVED
+}
+
+model ScheduledPost {
+  id             String         @id @default(cuid())
+  postId         String         @unique
+  scheduledFor   DateTime
+  platform       Platform
+  status         ScheduleStatus @default(QUEUED)
+  postedAt       DateTime?
+  platformPostId String?
+  platformUrl    String?
+  errorLog       String?
+  retryCount     Int            @default(0)
+  post           Post           @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@index([scheduledFor, status])
+}
+
+enum ScheduleStatus {
+  QUEUED
+  PROCESSING
+  POSTED
+  FAILED
+  CANCELLED
+}
+
+// ---------- Analytics & Learning ----------
+
+model PostMetrics {
+  id             String   @id @default(cuid())
+  postId         String
+  platform       Platform
+  fetchedAt      DateTime @default(now())
+  impressions    Int      @default(0)
+  reach          Int      @default(0)
+  likes          Int      @default(0)
+  comments       Int      @default(0)
+  shares         Int      @default(0)
+  saves          Int      @default(0)
+  clicks         Int      @default(0)
+  engagementRate Float    @default(0)
+  rawData        Json?
+  post           Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@index([postId, fetchedAt])
+}
+
+model PerformanceInsight {
+  id              String       @id @default(cuid())
+  brandId         String
+  generatedAt     DateTime     @default(now())
+  insightType     String
+  finding         String
+  recommendation  String
+  confidenceScore Float
+  appliedAt       DateTime?
+  brand           BrandProfile @relation(fields: [brandId], references: [id], onDelete: Cascade)
+
+  @@index([brandId, generatedAt])
+}
+
+// ---------- Usage Tracking ----------
+
+model AIUsage {
+  id           String   @id @default(cuid())
+  orgId        String
+  userId       String
+  operation    String
+  model        String
+  inputTokens  Int
+  outputTokens Int
+  costCents    Int
+  createdAt    DateTime @default(now())
+
+  @@index([orgId, createdAt])
+}
